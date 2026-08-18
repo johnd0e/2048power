@@ -1,0 +1,64 @@
+<!DOCTYPE html>
+<html>
+<head>
+  <meta charset="utf-8">
+  <title>Power — 2048 puzzle</title>
+  <link href="style/main.css" rel="stylesheet" type="text/css">
+  <link href="style/power.css" rel="stylesheet" type="text/css">
+  <link rel="shortcut icon" href="favicon.ico">
+  <meta name="viewport" content="width=device-width, target-densitydpi=160dpi, initial-scale=1.0, maximum-scale=1, user-scalable=no, minimal-ui">
+</head>
+<body class="power-page">
+  <div class="container">
+    <div class="heading">
+      <h1 class="title">Power</h1>
+      <div class="scores-container">
+        <div class="score-container">0</div>
+        <div class="best-container">0</div>
+      </div>
+    </div>
+
+    <div class="above-game">
+      <p class="game-intro">Merge 'em all!</p>
+      <span class="seed-field"><span class="seed-prefix">#</span><input class="seed-input" type="text" inputmode="numeric" size="10" aria-label="Seed"></span>
+      <a class="reset-button">Reset</a>
+      <a class="random-button">Random</a>
+    </div>
+
+    <div class="game-container">
+      <div class="game-message">
+        <p></p>
+        <div class="lower">
+          <a class="keep-playing-button">Keep playing</a>
+          <a class="retry-button">Retry</a>
+        </div>
+      </div>
+      <div class="grid-container">
+        <div class="grid-row"><div class="grid-cell"></div><div class="grid-cell"></div><div class="grid-cell"></div><div class="grid-cell"></div></div>
+        <div class="grid-row"><div class="grid-cell"></div><div class="grid-cell"></div><div class="grid-cell"></div><div class="grid-cell"></div></div>
+        <div class="grid-row"><div class="grid-cell"></div><div class="grid-cell"></div><div class="grid-cell"></div><div class="grid-cell"></div></div>
+        <div class="grid-row"><div class="grid-cell"></div><div class="grid-cell"></div><div class="grid-cell"></div><div class="grid-cell"></div></div>
+      </div>
+      <div class="tile-container"></div>
+    </div>
+
+    <p class="game-explanation">
+      <strong class="important">How to play:</strong> Use the <strong>left and right arrow keys</strong> to rotate the board. Tiles fall downward after each rotation, and equal tiles <strong>merge into one.</strong> No new tiles appear. Solve the puzzle by merging every tile into one.
+    </p>
+    <hr>
+    <p><strong class="important">Note:</strong> Vertical keys and swipes are not used. A puzzle ends when only one tile remains or no future merge is possible.</p>
+  </div>
+
+  <script src="js/bind_polyfill.js"></script>
+  <script src="js/classlist_polyfill.js"></script>
+  <script src="js/animframe_polyfill.js"></script>
+  <script src="js/keyboard_input_manager.js"></script>
+  <script src="js/html_actuator.js"></script>
+  <script src="js/grid.js"></script>
+  <script src="js/tile.js"></script>
+  <script src="js/local_storage_manager.js"></script>
+  <script src="js/game_manager.js"></script>
+  <script src="js/power_game_manager.js"></script>
+  <script src="js/power_application.js"></script>
+</body>
+</html>

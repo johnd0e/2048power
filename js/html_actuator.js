@@ -26,9 +26,9 @@ HTMLActuator.prototype.actuate = function (grid, metadata) {
 
     if (metadata.terminated) {
       if (metadata.over) {
-        self.message(false); // You lose
+        self.message(false, undefined, undefined, metadata.mode); // You lose
       } else if (metadata.won) {
-        self.message(true); // You win!
+        self.message(true, metadata.score, metadata.minimumMoves);
       }
     }
 
@@ -62,7 +62,10 @@ HTMLActuator.prototype.addTile = function (tile) {
   this.applyClasses(wrapper, classes);
 
   inner.classList.add("tile-inner");
-  inner.textContent = tile.value;
+  var value = document.createElement("span");
+  value.classList.add("tile-value");
+  value.textContent = tile.value;
+  inner.appendChild(value);
 
   if (tile.previousPosition) {
     // Make sure that the tile gets rendered in the previous position first
@@ -124,11 +127,15 @@ HTMLActuator.prototype.updateBestScore = function (bestScore) {
   this.bestContainer.textContent = bestScore;
 };
 
-HTMLActuator.prototype.message = function (won) {
+HTMLActuator.prototype.message = function (won, moves, minimumMoves, mode) {
   var type    = won ? "game-won" : "game-over";
-  var message = won ? "You win!" : "Game over!";
+  var optimal = won && moves === minimumMoves;
+  var message = !won ? (mode === "power" ? "No more merges!" : "Game over!") :
+    minimumMoves == null ? "You win!" : optimal ?
+    "Puzzle solved in the minimum number of moves!" : "Puzzle solved in " + moves + " moves";
 
   this.messageContainer.classList.add(type);
+  this.messageContainer.classList.toggle("optimal-win", optimal);
   this.messageContainer.getElementsByTagName("p")[0].textContent = message;
 };
 
@@ -136,4 +143,5 @@ HTMLActuator.prototype.clearMessage = function () {
   // IE only takes one value to remove at a time.
   this.messageContainer.classList.remove("game-won");
   this.messageContainer.classList.remove("game-over");
+  this.messageContainer.classList.remove("optimal-win");
 };
