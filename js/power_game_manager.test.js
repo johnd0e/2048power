@@ -105,6 +105,31 @@ vm.runInContext("PowerGameManager.prototype.setup = originalPowerSetup;", contex
 context.window.setTimeout = callback => callback();
 context.window.clearTimeout = function () {};
 
+const helpSwipeListeners = {};
+const helpText = {
+  addEventListener: (event, callback) => { helpSwipeListeners[event] = callback; }
+};
+context.document.querySelector = selector => selector === ".game-explanation" ? helpText : null;
+const helpSwipeManager = vm.runInContext("Object.create(PowerGameManager.prototype)", context);
+const helpDirections = [];
+helpSwipeManager.move = direction => helpDirections.push(direction);
+helpSwipeManager.bindHelpSwipe();
+const helpSwipeStart = (x, y) => helpSwipeListeners.touchstart({
+  touches: [{ clientX: x, clientY: y }]
+});
+const helpSwipeEnd = (x, y) => helpSwipeListeners.touchend({
+  changedTouches: [{ clientX: x, clientY: y }]
+});
+helpSwipeStart(10, 10);
+helpSwipeEnd(30, 11);
+helpSwipeStart(30, 10);
+helpSwipeEnd(10, 11);
+helpSwipeStart(10, 10);
+helpSwipeEnd(15, 10);
+helpSwipeStart(10, 10);
+helpSwipeEnd(11, 40);
+assert.deepEqual(helpDirections, [1, 3], "only horizontal swipes on the help text should rotate the Power board");
+
 const manager = vm.runInContext("Object.create(PowerGameManager.prototype)", context);
 manager.size = 4;
 manager.moves = 0;
@@ -165,24 +190,27 @@ swipePreviewAngles.length = 0;
 swipePreviewEnds.length = 0;
 let swipeTime = 1000;
 swipeContext.Date = { now: () => swipeTime };
-swipeStart(0, 0);
-swipeMove(50, 0);
-assert.deepEqual(swipePreviewAngles, [36], "dragging should preview a proportional rotation immediately");
+swipeStart(250, 125);
+swipeMove(338.38834765, 161.61165235);
+assert.ok(Math.abs(swipePreviewAngles[0] - 45) < 0.0001,
+  "dragging 45 degrees around the centre should preview a 45 degree rotation");
 swipeTime = 1400;
-swipeEnd(80, 0);
+swipeEnd(358.25317547, 187.5);
 assert.deepEqual(swipeDirections, [1, 3], "a long swipe below 75 percent should not make a move");
 assert.deepEqual(swipePreviewEnds, [false], "an incomplete long swipe should cancel the preview");
 swipeTime = 2000;
-swipeStart(0, 0);
-swipeMove(100, 0);
+swipeStart(250, 125);
+swipeMove(375, 250);
 swipeTime = 2400;
-swipeEnd(100, 0);
+swipeEnd(375, 250);
 assert.deepEqual(swipeDirections, [1, 3, 1], "a long swipe over 75 percent should make a move");
 assert.deepEqual(swipePreviewEnds, [false, true], "a completed long swipe should commit the preview");
+assert.ok(Math.abs(swipePreviewAngles[1] - 90) < 0.0001,
+  "preview angles should match the finger's angle around the centre");
 swipeTime = 3000;
-swipeStart(0, 0);
+swipeStart(250, 125);
 swipeTime = 3100;
-swipeEnd(20, 0);
+swipeEnd(271.70602221, 126.89903087);
 assert.deepEqual(swipeDirections, [1, 3, 1, 1], "a short swipe should keep the existing threshold");
 
 const previewGrid = { style: {} };

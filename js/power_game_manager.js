@@ -71,11 +71,29 @@ function PowerGameManager(size, InputManager, Actuator, StorageManager) {
       if (!touchMinimumVisible) restoreBest();
     });
   }
+  this.bindHelpSwipe();
   this.setup();
 }
 
 PowerGameManager.prototype = Object.create(GameManager.prototype);
 PowerGameManager.prototype.constructor = PowerGameManager;
+
+PowerGameManager.prototype.bindHelpSwipe = function () {
+  var help = document.querySelector(".game-explanation");
+  if (!help) return;
+  var startX, startY, self = this;
+  help.addEventListener("touchstart", function (event) {
+    if (event.touches.length !== 1) return;
+    startX = event.touches[0].clientX;
+    startY = event.touches[0].clientY;
+  });
+  help.addEventListener("touchend", function (event) {
+    if (startX === undefined || !event.changedTouches.length) return;
+    var dx = event.changedTouches[0].clientX - startX;
+    var dy = event.changedTouches[0].clientY - startY;
+    if (Math.abs(dx) > 10 && Math.abs(dx) > Math.abs(dy)) self.move(dx > 0 ? 1 : 3);
+  });
+};
 
 PowerGameManager.prototype.puzzles = [
   [[8, 2, 4, 0], [4, 0, 16, 0], [2, 0, 4, 0], [16, 0, 8, 0]],

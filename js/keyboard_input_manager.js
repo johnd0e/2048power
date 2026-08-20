@@ -79,8 +79,25 @@ KeyboardInputManager.prototype.listen = function () {
   this.bindButtonPress(".keep-playing-button", this.keepPlaying);
 
   // Respond to swipe events
-  var touchStartClientX, touchStartClientY, touchStartTime;
+  var touchStartClientX, touchStartClientY, touchStartTime, touchStartAngle;
   var gameContainer = document.getElementsByClassName("game-container")[0];
+
+  var touchAngle = function (clientX, clientY) {
+    var bounds = gameContainer.getBoundingClientRect();
+    var x = clientX - (bounds.left || 0) - bounds.width / 2;
+    var y = clientY - (bounds.top || 0) - bounds.height / 2;
+    return Math.sqrt(x * x + y * y) < 10 ? null : Math.atan2(y, x) * 180 / Math.PI;
+  };
+
+  var rotationAngle = function (clientX, clientY) {
+    var currentAngle = touchAngle(clientX, clientY);
+    if (touchStartAngle === null && currentAngle !== null) touchStartAngle = currentAngle;
+    if (touchStartAngle === null || currentAngle === null) return 0;
+    var angle = currentAngle - touchStartAngle;
+    if (angle > 180) angle -= 360;
+    if (angle < -180) angle += 360;
+    return Math.max(-90, Math.min(90, angle));
+  };
 
   gameContainer.addEventListener(this.eventTouchstart, function (event) {
     if ((!window.navigator.msPointerEnabled && event.touches.length > 1) ||
@@ -96,6 +113,7 @@ KeyboardInputManager.prototype.listen = function () {
       touchStartClientY = event.touches[0].clientY;
     }
     touchStartTime = Date.now();
+    touchStartAngle = touchAngle(touchStartClientX, touchStartClientY);
 
     event.preventDefault();
   });
@@ -109,17 +127,8 @@ KeyboardInputManager.prototype.listen = function () {
       touchClientX = event.touches[0].clientX;
       touchClientY = event.touches[0].clientY;
     }
-    var dx = touchClientX - touchStartClientX;
-    var dy = touchClientY - touchStartClientY;
-    var absDx = Math.abs(dx);
-    var absDy = Math.abs(dy);
-    var distance = Math.max(absDx, absDy);
-    if (distance) {
-      var bounds = gameContainer.getBoundingClientRect();
-      var fullRotationDistance = Math.min(bounds.width, bounds.height) / 4;
-      var angle = (absDx > absDy ? dx : -dy) / fullRotationDistance * 90;
-      self.emit("preview", Math.max(-90, Math.min(90, angle)));
-    }
+    var angle = rotationAngle(touchClientX, touchClientY);
+    if (angle) self.emit("preview", angle);
     event.preventDefault();
   });
 
@@ -145,16 +154,15 @@ KeyboardInputManager.prototype.listen = function () {
     var dy = touchEndClientY - touchStartClientY;
     var absDy = Math.abs(dy);
     var distance = Math.max(absDx, absDy);
-    var bounds = gameContainer.getBoundingClientRect();
-    var fullRotationDistance = Math.min(bounds.width, bounds.height) / 4;
-    var angle = (absDx > absDy ? dx : -dy) / fullRotationDistance * 90;
+    var angle = rotationAngle(touchEndClientX, touchEndClientY);
     var quickSwipe = Date.now() - touchStartTime < 300;
     var completed = quickSwipe ? distance > 10 : Math.abs(angle) > 67.5;
 
     self.emit("previewEnd", completed);
     if (completed) {
       // (right : left) : (down : up)
-      self.emit("move", absDx > absDy ? (dx > 0 ? 1 : 3) : (dy > 0 ? 3 : 1));
+      self.emit("move", angle ? (angle > 0 ? 1 : 3) :
+        (absDx > absDy ? (dx > 0 ? 1 : 3) : (dy > 0 ? 3 : 1)));
     }
   });
 };
