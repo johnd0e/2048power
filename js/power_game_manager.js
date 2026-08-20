@@ -25,7 +25,8 @@ function PowerGameManager(size, InputManager, Actuator, StorageManager) {
   var movesDisplay = document.querySelector(".score-container");
   if (movesDisplay) {
     var undoTimer;
-    movesDisplay.addEventListener("touchstart", function () {
+    movesDisplay.addEventListener("touchstart", function (event) {
+      event.preventDefault();
       undoTimer = window.setTimeout(function () { self.undo(); }, 600);
     });
     movesDisplay.addEventListener("touchend", function () { window.clearTimeout(undoTimer); });
@@ -33,25 +34,40 @@ function PowerGameManager(size, InputManager, Actuator, StorageManager) {
   }
   var bestDisplay = document.querySelector(".best-container");
   if (bestDisplay) {
-    var bestTimer;
-    var showMinimum = function () { bestDisplay.textContent = self.minimumMoves; };
+    var bestTimer, bestRestoreTimer, minimumVisible = false, touchMinimumVisible = false;
+    var showMinimum = function (fromTouch) {
+      window.clearTimeout(bestRestoreTimer);
+      minimumVisible = true;
+      touchMinimumVisible = !!fromTouch;
+      bestDisplay.textContent = self.minimumMoves;
+      bestRestoreTimer = window.setTimeout(restoreBest, 1000);
+    };
     var restoreBest = function () {
       window.clearTimeout(bestTimer);
+      window.clearTimeout(bestRestoreTimer);
+      minimumVisible = false;
+      touchMinimumVisible = false;
       bestDisplay.textContent = self.bestMoves === null ? "—" : self.bestMoves;
     };
     bestDisplay.addEventListener("touchstart", function () {
-      bestTimer = window.setTimeout(showMinimum, 600);
+      bestTimer = window.setTimeout(function () { showMinimum(true); }, 600);
     });
-    bestDisplay.addEventListener("touchend", restoreBest);
-    bestDisplay.addEventListener("touchcancel", restoreBest);
+    var endBestTouch = function () {
+      window.clearTimeout(bestTimer);
+      if (!minimumVisible) restoreBest();
+    };
+    bestDisplay.addEventListener("touchend", endBestTouch);
+    bestDisplay.addEventListener("touchcancel", endBestTouch);
     bestDisplay.addEventListener("mouseenter", function (event) {
-      if (event.ctrlKey) showMinimum();
+      if (event.ctrlKey) showMinimum(false);
     });
     bestDisplay.addEventListener("mousemove", function (event) {
-      if (event.ctrlKey) showMinimum();
-      else restoreBest();
+      if (event.ctrlKey) showMinimum(false);
+      else if (!touchMinimumVisible) restoreBest();
     });
-    bestDisplay.addEventListener("mouseleave", restoreBest);
+    bestDisplay.addEventListener("mouseleave", function () {
+      if (!touchMinimumVisible) restoreBest();
+    });
   }
   this.setup();
 }

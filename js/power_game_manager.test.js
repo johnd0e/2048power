@@ -58,6 +58,53 @@ vm.runInContext(fs.readFileSync(__dirname + "/html_actuator.js", "utf8"), contex
 vm.runInContext(fs.readFileSync(__dirname + "/game_manager.js", "utf8"), context);
 vm.runInContext(fs.readFileSync(__dirname + "/power_game_manager.js", "utf8"), context);
 
+const bestDisplayListeners = {};
+const bestDisplay = {
+  textContent: "7",
+  addEventListener: (event, callback) => { bestDisplayListeners[event] = callback; }
+};
+const scheduledTimers = [];
+context.document.querySelector = selector => selector === ".best-container" ? bestDisplay : null;
+context.window.setTimeout = (callback, delay) => {
+  const timer = { callback, delay, cleared: false };
+  scheduledTimers.push(timer);
+  return timer;
+};
+context.window.clearTimeout = timer => { if (timer) timer.cleared = true; };
+context.TestInput = function () { this.on = function () {}; };
+context.TestActuator = function () {};
+context.TestStorage = function () {};
+context.originalPowerSetup = vm.runInContext("PowerGameManager.prototype.setup", context);
+vm.runInContext("PowerGameManager.prototype.setup = function () {};", context);
+const longPressManager = vm.runInContext(
+  "new PowerGameManager(4, TestInput, TestActuator, TestStorage)",
+  context
+);
+longPressManager.minimumMoves = 9;
+longPressManager.bestMoves = 7;
+bestDisplayListeners.touchstart();
+scheduledTimers.find(timer => timer.delay === 600).callback();
+assert.equal(bestDisplay.textContent, 9, "a long press should reveal the minimum moves");
+bestDisplayListeners.touchend();
+assert.equal(bestDisplay.textContent, 9, "releasing a long press should not hide the minimum immediately");
+bestDisplayListeners.mousemove({ ctrlKey: false });
+assert.equal(bestDisplay.textContent, 9, "a synthetic mouse event after a long press should not hide the minimum");
+scheduledTimers.find(timer => timer.delay === 1000).callback();
+assert.equal(bestDisplay.textContent, 7, "the minimum should be hidden after one second");
+const movesDisplayListeners = {};
+const movesDisplay = {
+  addEventListener: (event, callback) => { movesDisplayListeners[event] = callback; }
+};
+context.document.querySelector = selector => selector === ".score-container" ? movesDisplay : null;
+vm.runInContext("PowerGameManager.prototype.setup = function () {};", context);
+vm.runInContext("new PowerGameManager(4, TestInput, TestActuator, TestStorage)", context);
+let movesTouchPrevented = false;
+movesDisplayListeners.touchstart({ preventDefault() { movesTouchPrevented = true; } });
+assert.equal(movesTouchPrevented, true, "a long press on Moves should prevent native text selection");
+vm.runInContext("PowerGameManager.prototype.setup = originalPowerSetup;", context);
+context.window.setTimeout = callback => callback();
+context.window.clearTimeout = function () {};
+
 const manager = vm.runInContext("Object.create(PowerGameManager.prototype)", context);
 manager.size = 4;
 manager.moves = 0;
@@ -77,6 +124,35 @@ assert.deepEqual(manager.grid.cells[0][0] && {
   y: manager.grid.cells[0][0].y
 }, { x: 0, y: 0 });
 assert.equal(manager.addRandomTile(), undefined);
+
+const swipeListeners = {};
+const swipeGameContainer = {
+  addEventListener: (event, callback) => { swipeListeners[event] = callback; }
+};
+const swipeContext = {
+  document: {
+    addEventListener() {},
+    querySelector: () => null,
+    getElementsByClassName: () => [swipeGameContainer]
+  },
+  window: { navigator: { msPointerEnabled: false } }
+};
+vm.createContext(swipeContext);
+vm.runInContext(fs.readFileSync(__dirname + "/keyboard_input_manager.js", "utf8"), swipeContext);
+const swipeInput = vm.runInContext("new KeyboardInputManager()", swipeContext);
+const swipeDirections = [];
+swipeInput.on("move", direction => swipeDirections.push(direction));
+const swipeStart = (x, y) => swipeListeners.touchstart({
+  touches: [{ clientX: x, clientY: y }], targetTouches: [{}], preventDefault() {}
+});
+const swipeEnd = (x, y) => swipeListeners.touchend({
+  touches: [], targetTouches: [], changedTouches: [{ clientX: x, clientY: y }]
+});
+swipeStart(100, 200);
+swipeEnd(100, 100);
+swipeStart(100, 100);
+swipeEnd(100, 200);
+assert.deepEqual(swipeDirections, [1, 3], "vertical swipes should rotate clockwise and counterclockwise");
 
 const movingManager = vm.runInContext("Object.create(PowerGameManager.prototype)", context);
 movingManager.size = 4;
