@@ -10,6 +10,8 @@ function PowerGameManager(size, InputManager, Actuator, StorageManager) {
   this.undoStack = [];
   this.animating = false;
   this.inputManager.on("move", this.move.bind(this));
+  this.inputManager.on("preview", this.previewRotation.bind(this));
+  this.inputManager.on("previewEnd", this.endPreview.bind(this));
   this.inputManager.on("restart", this.restart.bind(this));
   this.inputManager.on("undo", this.undo.bind(this));
   this.inputManager.on("keepPlaying", function () {});
@@ -366,6 +368,17 @@ PowerGameManager.prototype.move = function (direction) {
   }, reducedMotion ? 0 : 450);
 };
 
+PowerGameManager.prototype.previewRotation = function (angle) {
+  if (this.isGameTerminated() || this.animating) return;
+  this.applyRotation(this.rotation + angle, true);
+};
+
+PowerGameManager.prototype.endPreview = function (completed) {
+  var game = document.querySelector(".game-container");
+  if (game) game.classList.toggle("swipe-preview", false);
+  if (!completed) this.applyRotation();
+};
+
 PowerGameManager.prototype.tileCount = function (board) {
   return board.reduce(function (count, row) {
     return count + row.filter(Boolean).length;
@@ -496,8 +509,9 @@ PowerGameManager.prototype.actuate = function () {
   if (game) game.classList.toggle("soft-stalemate", this.softStalemate);
 };
 
-PowerGameManager.prototype.applyRotation = function () {
-  var angle = this.rotation + "deg", counter = (-this.rotation) + "deg";
+PowerGameManager.prototype.applyRotation = function (displayRotation, preview) {
+  displayRotation = displayRotation == null ? this.rotation : displayRotation;
+  var angle = displayRotation + "deg", counter = (-displayRotation) + "deg";
   var grid = document.querySelector(".grid-container");
   var tiles = document.querySelector(".tile-container");
   var game = document.querySelector(".game-container");
@@ -505,6 +519,7 @@ PowerGameManager.prototype.applyRotation = function () {
   if (tiles) tiles.style.transform = "rotate(" + angle + ")";
   if (game) {
     game.classList.add("power-mode");
+    game.classList.toggle("swipe-preview", !!preview);
     game.style.setProperty("--power-counter-rotation", counter);
   }
 };

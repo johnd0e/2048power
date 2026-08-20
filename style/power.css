@@ -77,6 +77,12 @@
   transition: transform 450ms cubic-bezier(0.22, 0.61, 0.36, 1);
 }
 
+.power-page .game-container.swipe-preview .grid-container,
+.power-page .game-container.swipe-preview .tile-container,
+.power-page .game-container.swipe-preview .tile-value {
+  transition: none;
+}
+
 .game-container.soft-stalemate {
   box-shadow: 0 0 0 4px #edcf72;
 }

@@ -79,7 +79,7 @@ KeyboardInputManager.prototype.listen = function () {
   this.bindButtonPress(".keep-playing-button", this.keepPlaying);
 
   // Respond to swipe events
-  var touchStartClientX, touchStartClientY;
+  var touchStartClientX, touchStartClientY, touchStartTime;
   var gameContainer = document.getElementsByClassName("game-container")[0];
 
   gameContainer.addEventListener(this.eventTouchstart, function (event) {
@@ -95,11 +95,31 @@ KeyboardInputManager.prototype.listen = function () {
       touchStartClientX = event.touches[0].clientX;
       touchStartClientY = event.touches[0].clientY;
     }
+    touchStartTime = Date.now();
 
     event.preventDefault();
   });
 
   gameContainer.addEventListener(this.eventTouchmove, function (event) {
+    var touchClientX, touchClientY;
+    if (window.navigator.msPointerEnabled) {
+      touchClientX = event.pageX;
+      touchClientY = event.pageY;
+    } else {
+      touchClientX = event.touches[0].clientX;
+      touchClientY = event.touches[0].clientY;
+    }
+    var dx = touchClientX - touchStartClientX;
+    var dy = touchClientY - touchStartClientY;
+    var absDx = Math.abs(dx);
+    var absDy = Math.abs(dy);
+    var distance = Math.max(absDx, absDy);
+    if (distance) {
+      var bounds = gameContainer.getBoundingClientRect();
+      var fullRotationDistance = Math.min(bounds.width, bounds.height) / 4;
+      var angle = (absDx > absDy ? dx : -dy) / fullRotationDistance * 90;
+      self.emit("preview", Math.max(-90, Math.min(90, angle)));
+    }
     event.preventDefault();
   });
 
@@ -124,8 +144,15 @@ KeyboardInputManager.prototype.listen = function () {
 
     var dy = touchEndClientY - touchStartClientY;
     var absDy = Math.abs(dy);
+    var distance = Math.max(absDx, absDy);
+    var bounds = gameContainer.getBoundingClientRect();
+    var fullRotationDistance = Math.min(bounds.width, bounds.height) / 4;
+    var angle = (absDx > absDy ? dx : -dy) / fullRotationDistance * 90;
+    var quickSwipe = Date.now() - touchStartTime < 300;
+    var completed = quickSwipe ? distance > 10 : Math.abs(angle) > 67.5;
 
-    if (Math.max(absDx, absDy) > 10) {
+    self.emit("previewEnd", completed);
+    if (completed) {
       // (right : left) : (down : up)
       self.emit("move", absDx > absDy ? (dx > 0 ? 1 : 3) : (dy > 0 ? 3 : 1));
     }

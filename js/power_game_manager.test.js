@@ -127,7 +127,8 @@ assert.equal(manager.addRandomTile(), undefined);
 
 const swipeListeners = {};
 const swipeGameContainer = {
-  addEventListener: (event, callback) => { swipeListeners[event] = callback; }
+  addEventListener: (event, callback) => { swipeListeners[event] = callback; },
+  getBoundingClientRect: () => ({ width: 500, height: 500 })
 };
 const swipeContext = {
   document: {
@@ -141,9 +142,16 @@ vm.createContext(swipeContext);
 vm.runInContext(fs.readFileSync(__dirname + "/keyboard_input_manager.js", "utf8"), swipeContext);
 const swipeInput = vm.runInContext("new KeyboardInputManager()", swipeContext);
 const swipeDirections = [];
+const swipePreviewAngles = [];
+const swipePreviewEnds = [];
 swipeInput.on("move", direction => swipeDirections.push(direction));
+swipeInput.on("preview", angle => swipePreviewAngles.push(angle));
+swipeInput.on("previewEnd", committed => swipePreviewEnds.push(committed));
 const swipeStart = (x, y) => swipeListeners.touchstart({
   touches: [{ clientX: x, clientY: y }], targetTouches: [{}], preventDefault() {}
+});
+const swipeMove = (x, y) => swipeListeners.touchmove({
+  touches: [{ clientX: x, clientY: y }], preventDefault() {}
 });
 const swipeEnd = (x, y) => swipeListeners.touchend({
   touches: [], targetTouches: [], changedTouches: [{ clientX: x, clientY: y }]
@@ -153,6 +161,56 @@ swipeEnd(100, 100);
 swipeStart(100, 100);
 swipeEnd(100, 200);
 assert.deepEqual(swipeDirections, [1, 3], "vertical swipes should rotate clockwise and counterclockwise");
+swipePreviewAngles.length = 0;
+swipePreviewEnds.length = 0;
+let swipeTime = 1000;
+swipeContext.Date = { now: () => swipeTime };
+swipeStart(0, 0);
+swipeMove(50, 0);
+assert.deepEqual(swipePreviewAngles, [36], "dragging should preview a proportional rotation immediately");
+swipeTime = 1400;
+swipeEnd(80, 0);
+assert.deepEqual(swipeDirections, [1, 3], "a long swipe below 75 percent should not make a move");
+assert.deepEqual(swipePreviewEnds, [false], "an incomplete long swipe should cancel the preview");
+swipeTime = 2000;
+swipeStart(0, 0);
+swipeMove(100, 0);
+swipeTime = 2400;
+swipeEnd(100, 0);
+assert.deepEqual(swipeDirections, [1, 3, 1], "a long swipe over 75 percent should make a move");
+assert.deepEqual(swipePreviewEnds, [false, true], "a completed long swipe should commit the preview");
+swipeTime = 3000;
+swipeStart(0, 0);
+swipeTime = 3100;
+swipeEnd(20, 0);
+assert.deepEqual(swipeDirections, [1, 3, 1, 1], "a short swipe should keep the existing threshold");
+
+const previewGrid = { style: {} };
+const previewTiles = { style: {} };
+const previewGame = {
+  style: { setProperty(name, value) { this[name] = value; } },
+  classList: {
+    add(name) { this[name] = true; },
+    toggle(name, enabled) { this[name] = enabled; }
+  }
+};
+context.document.querySelector = selector => ({
+  ".grid-container": previewGrid,
+  ".tile-container": previewTiles,
+  ".game-container": previewGame
+}[selector] || null);
+const previewManager = vm.runInContext("Object.create(PowerGameManager.prototype)", context);
+previewManager.rotation = 0;
+previewManager.animating = false;
+previewManager.won = false;
+previewManager.hardStalemate = false;
+previewManager.previewRotation(36);
+assert.equal(previewGrid.style.transform, "rotate(36deg)", "the Power board should follow the preview angle");
+assert.equal(previewGame.style["--power-counter-rotation"], "-36deg", "tile labels should stay upright during preview");
+assert.equal(previewGame.classList["swipe-preview"], true, "the preview should disable the rotation transition while dragging");
+previewManager.endPreview(false);
+assert.equal(previewGrid.style.transform, "rotate(0deg)", "a cancelled preview should return the board to its current rotation");
+assert.equal(previewGame.classList["swipe-preview"], false, "the preview transition mode should end when the touch ends");
 
 const movingManager = vm.runInContext("Object.create(PowerGameManager.prototype)", context);
 movingManager.size = 4;
