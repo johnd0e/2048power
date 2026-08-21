@@ -181,6 +181,11 @@ const swipeMove = (x, y) => swipeListeners.touchmove({
 const swipeEnd = (x, y) => swipeListeners.touchend({
   touches: [], targetTouches: [], changedTouches: [{ clientX: x, clientY: y }]
 });
+const swipeCancel = () => {
+  if (swipeListeners.touchcancel) swipeListeners.touchcancel({
+    touches: [], targetTouches: []
+  });
+};
 swipeStart(100, 200);
 swipeEnd(100, 100);
 swipeStart(100, 100);
@@ -212,6 +217,11 @@ swipeStart(250, 125);
 swipeTime = 3100;
 swipeEnd(271.70602221, 126.89903087);
 assert.deepEqual(swipeDirections, [1, 3, 1, 1], "a short swipe should keep the existing threshold");
+swipeStart(250, 125);
+swipeMove(300, 150);
+swipeCancel();
+assert.deepEqual(swipePreviewEnds, [false, true, true, false],
+  "cancelling a swipe should end preview mode so keyboard moves stay animated");
 
 const previewGrid = { style: {} };
 const previewTiles = { style: {} };

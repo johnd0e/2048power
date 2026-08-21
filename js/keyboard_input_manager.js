@@ -6,10 +6,12 @@ function KeyboardInputManager() {
     this.eventTouchstart    = "MSPointerDown";
     this.eventTouchmove     = "MSPointerMove";
     this.eventTouchend      = "MSPointerUp";
+    this.eventTouchcancel   = "MSPointerCancel";
   } else {
     this.eventTouchstart    = "touchstart";
     this.eventTouchmove     = "touchmove";
     this.eventTouchend      = "touchend";
+    this.eventTouchcancel   = "touchcancel";
   }
 
   this.listen();
@@ -164,6 +166,10 @@ KeyboardInputManager.prototype.listen = function () {
       self.emit("move", angle ? (angle > 0 ? 1 : 3) :
         (absDx > absDy ? (dx > 0 ? 1 : 3) : (dy > 0 ? 3 : 1)));
     }
+  });
+
+  gameContainer.addEventListener(this.eventTouchcancel, function () {
+    self.emit("previewEnd", false);
   });
 };
 
