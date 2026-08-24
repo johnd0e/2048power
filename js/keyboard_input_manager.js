@@ -62,6 +62,10 @@ KeyboardInputManager.prototype.listen = function () {
         event.preventDefault();
         self.emit("move", mapped);
       }
+      if (event.which >= 49 && event.which <= 52) {
+        event.preventDefault();
+        self.emit("selectStack", event.which - 49);
+      }
     }
 
     // R key restarts the game
@@ -165,6 +169,11 @@ KeyboardInputManager.prototype.listen = function () {
       // (right : left) : (down : up)
       self.emit("move", angle ? (angle > 0 ? 1 : 3) :
         (absDx > absDy ? (dx > 0 ? 1 : 3) : (dy > 0 ? 3 : 1)));
+    } else if (distance <= 10) {
+      var bounds = gameContainer.getBoundingClientRect();
+      var column = Math.floor((touchEndClientX - (bounds.left || 0)) /
+        bounds.width * 4);
+      if (column >= 0 && column < 4) self.emit("selectStack", column);
     }
   });
 

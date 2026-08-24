@@ -20,9 +20,16 @@
 
     <div class="above-game">
       <p class="game-intro">Merge 'em all!</p>
-      <span class="seed-field"><span class="seed-prefix">#</span><input class="seed-input" type="text" inputmode="numeric" size="10" aria-label="Seed"></span>
+      <span class="seed-field"><span class="seed-prefix">#</span><input class="seed-input" type="text" inputmode="text" size="10" aria-label="Seed (c/g/p prefix optional)"></span>
       <a class="reset-button">Reset</a>
-      <a class="random-button">Random</a>
+      <span class="random-menu"><a class="random-button">Random</a><button class="mode-menu-button" aria-label="Choose game mode">▾</button>
+        <span class="mode-menu">
+          <button type="button" data-mode="classic">Classic</button>
+          <button type="button" data-mode="gravity">Super Gravity</button>
+          <button type="button" data-mode="push">Push to Merge</button>
+        </span>
+        <span class="mode-label" aria-live="polite">Classic</span>
+      </span>
     </div>
 
     <div class="game-container">
@@ -42,9 +49,13 @@
       <div class="tile-container"></div>
     </div>
 
-    <p class="game-explanation">
-      <strong class="important">How to play:</strong> Use the <strong>left and right arrow keys</strong> to rotate the board. Tiles fall downward after each rotation, and equal tiles <strong>merge into one.</strong> No new tiles appear. Solve the puzzle by merging every tile into one.
-    </p>
+    <div class="game-explanation">
+      <p><strong class="important">How to play:</strong> Use the <strong>left and right arrow keys</strong> to rotate the board. Tiles fall downward after each rotation. No new tiles appear. Solve the puzzle by merging every tile into one.</p>
+      <ul>
+        <li>In Super Gravity: equal tiles merge in parallel with cascades;</li>
+        <li>in Push to Merge: choose a stack with <strong>1–4 or click/tap</strong> to merge it once.</li>
+      </ul>
+    </div>
     <hr>
     <p><strong class="important">Note:</strong> A puzzle ends when only one tile remains or no future merge is possible.</p>
   </div>
