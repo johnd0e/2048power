@@ -12,6 +12,8 @@ const powerPage = fs.readFileSync(powerPagePath, "utf8");
 assert.match(powerCss, /\.power-page \.tile-container \{[^}]*width: 470px;[^}]*height: 470px;/s);
 assert.match(powerCss, /\.power-mode \.tile-value \{[^}]*transition: transform 450ms/s);
 assert.match(powerCss, /\.power-page \.above-game \{[^}]*gap: 5px;/s);
+assert.match(powerCss, /\.power-page \.random-menu \{[^}]*z-index: 200;/s);
+assert.match(powerCss, /\.power-page \.mode-label \{[^}]*position: absolute;[^}]*top: 43px;/s);
 assert.match(powerCss, /\.seed-input \{[^}]*height: 40px;/s);
 assert.match(powerCss, /\.seed-input \{[^}]*field-sizing: content;/s);
 assert.match(powerCss, /\.game-container\.soft-stalemate/);
@@ -37,8 +39,14 @@ assert.match(classicApplication, /new GameManager\(4, KeyboardInputManager, HTML
 assert.doesNotMatch(index, /power_game_manager\.js/);
 assert.match(powerPage, /<title>Power — 2048 puzzle<\/title>/);
 assert.match(powerPage, /style\/power\.css/);
+assert.match(powerPage, /<span class="random-menu">[\s\S]*<span class="mode-label"/);
 assert.doesNotMatch(index, /style\/power\.css/);
 assert.match(powerPage, /power_application\.js/);
+assert.match(powerPage, /data-mode="gravity"/);
+assert.match(powerPage, /data-mode="push"/);
+assert.doesNotMatch(powerPage, /stack-controls/);
+assert.doesNotMatch(powerCss, /random-menu:hover \.mode-menu/);
+assert.match(powerCss, /random-menu\.open \.mode-menu/);
 assert.match(fs.readFileSync(__dirname + "/power_application.js", "utf8"), /PowerStorageManager/);
 assert.match(fs.readFileSync(__dirname + "/power_application.js", "utf8"), /powerGameState/);
 
@@ -169,9 +177,11 @@ const swipeInput = vm.runInContext("new KeyboardInputManager()", swipeContext);
 const swipeDirections = [];
 const swipePreviewAngles = [];
 const swipePreviewEnds = [];
+const swipeStackSelections = [];
 swipeInput.on("move", direction => swipeDirections.push(direction));
 swipeInput.on("preview", angle => swipePreviewAngles.push(angle));
 swipeInput.on("previewEnd", committed => swipePreviewEnds.push(committed));
+swipeInput.on("selectStack", column => swipeStackSelections.push(column));
 const swipeStart = (x, y) => swipeListeners.touchstart({
   touches: [{ clientX: x, clientY: y }], targetTouches: [{}], preventDefault() {}
 });
@@ -222,6 +232,9 @@ swipeMove(300, 150);
 swipeCancel();
 assert.deepEqual(swipePreviewEnds, [false, true, true, false],
   "cancelling a swipe should end preview mode so keyboard moves stay animated");
+swipeStart(440, 250);
+swipeEnd(440, 250);
+assert.deepEqual(swipeStackSelections, [3], "a touch tap should select its board column");
 
 const previewGrid = { style: {} };
 const previewTiles = { style: {} };
@@ -309,6 +322,267 @@ context.PowerGameManager.generatorConfig.maxMoves = originalMaxMoves;
 assert.ok(context.PowerGameManager.generatorConfig.maxMoves < 50);
 assert.match(fs.readFileSync(__dirname + "/power_game_manager.js", "utf8"), /this\.softStalemate = !this\.won && this\.shortestSolution/);
 assert.match(fs.readFileSync(__dirname + "/power_game_manager.js", "utf8"), /classList\.toggle\("soft-stalemate", this\.softStalemate\)/);
+assert.match(fs.readFileSync(__dirname + "/keyboard_input_manager.js", "utf8"), /emit\("selectStack", event\.which - 49\)/);
+
+assert.equal(context.PowerGameManager.parseSeed("g123").mode, "gravity");
+assert.equal(context.PowerGameManager.parseSeed("g123").value, 123);
+assert.equal(context.PowerGameManager.parseSeed("123", "push").mode, "push");
+assert.equal(context.PowerGameManager.parseSeed("123", "push").value, 123);
+assert.equal(context.PowerGameManager.formatSeed("classic", 123), "c123");
+assert.equal(context.PowerGameManager.formatSeed("gravity", 123), "g123");
+assert.equal(context.PowerGameManager.formatSeed("push", 123), "p123");
+
+const mergeManager = vm.runInContext("Object.create(PowerGameManager.prototype)", context);
+mergeManager.size = 4;
+assert.equal(JSON.stringify(mergeManager.mergeStack([2, 2, 2, 2])), JSON.stringify([4, 4]));
+assert.equal(JSON.stringify(mergeManager.mergeStack([2, 2, 2])), JSON.stringify([4, 2]));
+assert.equal(JSON.stringify(mergeManager.resolveMergeRound([
+  [2, 0, 2, 0], [2, 0, 2, 0], [0, 0, 0, 0], [0, 0, 0, 0]
+], [0, 1, 2, 3])), JSON.stringify([
+  [0, 0, 0, 0], [0, 0, 0, 0], [0, 0, 0, 0], [4, 0, 4, 0]
+]));
+assert.equal(JSON.stringify(mergeManager.resolveCascades([
+  [0, 0, 0, 0], [2, 0, 0, 0], [2, 0, 0, 0], [4, 0, 0, 0]
+])), JSON.stringify([
+  [0, 0, 0, 0], [0, 0, 0, 0], [0, 0, 0, 0], [8, 0, 0, 0]
+]));
+
+function moveBoard(mode, board, direction) {
+  var moveManager = vm.runInContext(
+    "Object.create(PowerGameManager.prototype)", context
+  );
+  moveManager.size = 4;
+  moveManager.mode = mode;
+  moveManager.seed = 1;
+  moveManager.puzzleKey = "test-" + mode;
+  moveManager.initialBoard = board;
+  moveManager.grid = moveManager.gridFromBoard(board);
+  moveManager.moves = 0;
+  moveManager.rotation = 0;
+  moveManager.undoStack = [];
+  moveManager.won = false;
+  moveManager.softStalemate = false;
+  moveManager.hardStalemate = false;
+  moveManager.storageManager = {
+    storage: { getItem: () => null, setItem() {} },
+    setGameState() {}
+  };
+  moveManager.actuator = { actuate() {}, continueGame() {} };
+  moveManager.move(direction);
+  return JSON.parse(JSON.stringify(moveManager.boardFromGrid(moveManager.grid)));
+}
+
+[
+  {
+    name: "cascades right after merging into an existing tile",
+    mode: "gravity",
+    board: [[0, 0, 0, 0], [0, 0, 0, 0], [0, 0, 0, 0], [4, 0, 2, 2]],
+    direction: 1,
+    expected: [[0, 0, 0, 0], [0, 0, 0, 0], [0, 0, 0, 0], [0, 0, 0, 8]]
+  },
+  {
+    name: "cascades left through two rounds of four equal tiles",
+    mode: "gravity",
+    board: [[2, 2, 2, 2], [0, 0, 0, 0], [0, 0, 0, 0], [0, 0, 0, 0]],
+    direction: 3,
+    expected: [[8, 0, 0, 0], [0, 0, 0, 0], [0, 0, 0, 0], [0, 0, 0, 0]]
+  },
+  {
+    name: "keeps separate pairs after a standard right move",
+    mode: "classic",
+    board: [[0, 0, 0, 0], [0, 0, 0, 0], [0, 0, 0, 0], [2, 2, 2, 2]],
+    direction: 1,
+    expected: [[0, 0, 0, 0], [0, 0, 0, 0], [0, 0, 0, 0], [0, 0, 4, 4]]
+  },
+  {
+    name: "merges equal tiles after a right rotation",
+    mode: "push",
+    board: [[0, 0, 0, 0], [0, 0, 0, 0], [0, 0, 0, 0], [2, 2, 2, 2]],
+    direction: 1,
+    expected: [[0, 0, 0, 0], [0, 0, 0, 0], [0, 0, 0, 0], [0, 0, 4, 4]]
+  }
+].forEach(function (scenario) {
+assert.deepEqual(moveBoard(scenario.mode, scenario.board, scenario.direction),
+    scenario.expected, scenario.mode + " " + scenario.name);
+});
+
+const modeTransitionBoard = [[2, 2, 2, 2], [0, 0, 0, 0],
+  [0, 0, 0, 0], [0, 0, 0, 0]];
+assert.equal(JSON.stringify(manager.nextBoardForMode(
+  modeTransitionBoard, true, "classic"
+)), JSON.stringify([[0, 0, 0, 0], [0, 0, 0, 0],
+  [0, 0, 0, 4], [0, 0, 0, 4]]),
+  "classic generation must perform one merge round");
+assert.equal(JSON.stringify(manager.nextBoardForMode(
+  modeTransitionBoard, true, "gravity"
+)), JSON.stringify([[0, 0, 0, 0], [0, 0, 0, 0],
+  [0, 0, 0, 0], [0, 0, 0, 8]]),
+  "gravity generation must perform cascaded merges");
+assert.equal(JSON.stringify(manager.nextBoardForMode(
+  modeTransitionBoard, true, "push"
+)), JSON.stringify([[0, 0, 0, 0], [0, 0, 0, 0],
+  [0, 0, 0, 4], [0, 0, 0, 4]]),
+  "push generation must merge after a rotation");
+assert.equal(manager.canSolveByRotation(modeTransitionBoard, "classic", true), true);
+assert.equal(manager.canSolveByRotation(modeTransitionBoard, "gravity", true), true);
+assert.equal(manager.canSolveByRotation(modeTransitionBoard, "push", true), true);
+assert.equal(manager.isOneWayRotationPuzzle(modeTransitionBoard, "classic"), true);
+
+const serializedManager = vm.runInContext(
+  "Object.create(PowerGameManager.prototype)", context
+);
+serializedManager.grid = new context.Grid(4);
+serializedManager.initialBoard = [[2, 0, 0, 0], [0, 0, 0, 0],
+  [0, 0, 0, 0], [0, 0, 0, 0]];
+serializedManager.puzzleKey = "seed-c123";
+serializedManager.seed = 123;
+serializedManager.mode = "classic";
+serializedManager.rotation = 0;
+serializedManager.moves = 0;
+serializedManager.bestMoves = null;
+serializedManager.minimumMoves = 9;
+serializedManager.won = false;
+serializedManager.softStalemate = false;
+serializedManager.hardStalemate = false;
+assert.equal(Object.prototype.hasOwnProperty.call(
+  serializedManager.serialize(), "initialBoard"
+), false, "persisted Power state should derive the initial board from its seed");
+for (const field of ["bestMoves", "puzzleKey", "seed"]) {
+  assert.equal(Object.prototype.hasOwnProperty.call(
+    serializedManager.serialize(), field
+  ), false, "persisted Power state should derive " + field);
+}
+
+const restoredBoard = [[2, 4, 0, 0], [0, 0, 0, 0],
+  [0, 0, 0, 0], [0, 0, 0, 0]];
+const persistedGrid = new context.Grid(4);
+persistedGrid.insertTile(new context.Tile({ x: 0, y: 0 }, 2));
+const restoredFromSeed = vm.runInContext(
+  "Object.create(PowerGameManager.prototype)", context
+);
+restoredFromSeed.size = 4;
+restoredFromSeed.randomPuzzle = seed => {
+  assert.equal(seed, "c123");
+  return { board: restoredBoard, minimumMoves: 9, seed: 123, mode: "classic" };
+};
+restoredFromSeed.storageManager = {
+  getGameState: () => ({
+    mode: "power",
+    grid: persistedGrid.serialize(),
+    seedText: "c123",
+    seedMode: "classic",
+    minimumMoves: 9,
+    moves: 1,
+    rotation: 0,
+    won: false,
+    softStalemate: false,
+    hardStalemate: false
+  }),
+  storage: { getItem: () => null },
+  setGameState() {}
+};
+restoredFromSeed.actuator = { actuate() {} };
+restoredFromSeed.updateStatus = () => {};
+restoredFromSeed.actuate = () => {};
+restoredFromSeed.setup();
+assert.deepEqual(JSON.parse(JSON.stringify(restoredFromSeed.initialBoard)), restoredBoard,
+  "restored Power state should rebuild its initial board from the seed");
+
+const classicBoard = manager.randomPuzzle("c1234").board;
+const gravityBoard = manager.randomPuzzle("g1234").board;
+const pushBoard = manager.randomPuzzle("p1234").board;
+assert.notDeepEqual(classicBoard, gravityBoard);
+assert.notDeepEqual(classicBoard, pushBoard);
+assert.notDeepEqual(gravityBoard, pushBoard);
+assert.deepEqual(manager.randomPuzzle("g1234"), manager.randomPuzzle("g1234"));
+
+manager.mode = "push";
+manager.grid = manager.gridFromBoard(pushBoard);
+manager.won = false;
+manager.hardStalemate = false;
+manager.updateStatus();
+assert.equal(manager.hardStalemate, false,
+  "a generated Push puzzle must not be marked unsolvable before a move");
+assert.equal(typeof manager.fallGrid, "function");
+assert.equal(typeof manager.mergeGrid, "function");
+assert.equal(context.PowerGameManager.gravityTiming.collapseDelay, 200);
+assert.equal(context.PowerGameManager.gravityTiming.cascadeDelay, undefined);
+
+const mergeGridManager = vm.runInContext("Object.create(PowerGameManager.prototype)", context);
+mergeGridManager.size = 4;
+mergeGridManager.grid = new context.Grid(4);
+mergeGridManager.grid.insertTile(new context.Tile({ x: 0, y: 2 }, 2));
+mergeGridManager.grid.insertTile(new context.Tile({ x: 0, y: 3 }, 2));
+assert.equal(mergeGridManager.mergeGrid(2), true);
+assert.equal(mergeGridManager.grid.cells[0][3].mergedFrom.length, 2,
+  "gravity merge must retain the two source tiles for animation");
+
+const gravityDispatch = vm.runInContext("Object.create(PowerGameManager.prototype)", context);
+gravityDispatch.mode = "gravity";
+gravityDispatch.moves = 0;
+gravityDispatch.rotation = 0;
+gravityDispatch.won = false;
+gravityDispatch.hardStalemate = false;
+gravityDispatch.animating = false;
+gravityDispatch.undoStack = [];
+gravityDispatch.snapshot = () => ({});
+gravityDispatch.applyRotation = () => {};
+gravityDispatch.runGravityStages = direction => { gravityDispatch.stageDirection = direction; };
+gravityDispatch.move(3);
+assert.equal(gravityDispatch.stageDirection, 3,
+  "Gravity moves must dispatch to staged animation");
+
+const gravityMove = vm.runInContext("Object.create(PowerGameManager.prototype)", context);
+gravityMove.size = 4;
+gravityMove.mode = "gravity";
+gravityMove.seed = 1;
+gravityMove.puzzleKey = "seed-g1";
+gravityMove.initialBoard = gravityBoard;
+gravityMove.grid = gravityMove.gridFromBoard(gravityBoard);
+gravityMove.moves = 0;
+gravityMove.rotation = 0;
+gravityMove.undoStack = [];
+gravityMove.won = false;
+gravityMove.softStalemate = false;
+gravityMove.hardStalemate = false;
+gravityMove.storageManager = {
+  storage: { getItem: () => null, setItem() {} },
+  setGameState() {}
+};
+gravityMove.actuator = { actuate() {}, continueGame() {} };
+gravityMove.move(1);
+assert.equal(gravityMove.animating, false, "Gravity animation must finish");
+assert.equal(gravityMove.hardStalemate, false, "Gravity must remain playable after a move");
+gravityMove.move(3);
+assert.equal(gravityMove.moves, 2, "Gravity arrows must remain usable after the first move");
+
+const pushMergeGrid = vm.runInContext("Object.create(PowerGameManager.prototype)", context);
+pushMergeGrid.size = 4;
+pushMergeGrid.grid = new context.Grid(4);
+pushMergeGrid.grid.insertTile(new context.Tile({ x: 0, y: 2 }, 2));
+pushMergeGrid.grid.insertTile(new context.Tile({ x: 0, y: 3 }, 2));
+assert.equal(pushMergeGrid.mergeGrid(2, { axis: "column", index: 0 }), true);
+assert.equal(pushMergeGrid.grid.cells[0][3].mergedFrom.length, 2,
+  "Push merges must retain source tiles for animation");
+
+const pushSelection = vm.runInContext("Object.create(PowerGameManager.prototype)", context);
+pushSelection.size = 4;
+pushSelection.mode = "push";
+pushSelection.rotation = 0;
+pushSelection.moves = 0;
+pushSelection.won = false;
+pushSelection.hardStalemate = false;
+pushSelection.animating = false;
+pushSelection.undoStack = [];
+pushSelection.snapshot = () => ({});
+pushSelection.updateStatus = () => {};
+pushSelection.actuate = () => {};
+pushSelection.grid = new context.Grid(4);
+pushSelection.grid.insertTile(new context.Tile({ x: 0, y: 2 }, 2));
+pushSelection.grid.insertTile(new context.Tile({ x: 0, y: 3 }, 2));
+pushSelection.selectStack(0);
+assert.equal(pushSelection.grid.cells[0][3].mergedFrom.length, 2,
+  "Push selection must use the animated merge path");
 
 const screenshotBoard = [[32, 0, 0, 0], [64, 0, 0, 0], [8, 16, 0, 0], [4, 4, 0, 0]];
 manager.rotation = 0;
@@ -363,13 +637,11 @@ for (let index = 0; index < 100; index++) {
   assert.ok(puzzle.minimumMoves >= 9 && puzzle.minimumMoves <= 12);
 }
 assert.ok(randomBoards.size > 4);
-
-const loadedBoard = manager.puzzleBoard(3);
-for (let row = 0; row < 3; row++) {
-  for (let column = 0; column < 4; column++) {
-    assert.equal(Boolean(loadedBoard[row][column] && !loadedBoard[row + 1][column]), false);
-  }
-}
+const originalAttempts = context.PowerGameManager.generatorConfig.attempts;
+context.PowerGameManager.generatorConfig.attempts = 0;
+assert.equal(manager.randomPuzzle("c123"), null,
+  "generator must reject seeds without a valid candidate");
+context.PowerGameManager.generatorConfig.attempts = originalAttempts;
 
 const messageText = { textContent: "" };
 const messageClasses = new Set();
