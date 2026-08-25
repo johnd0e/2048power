@@ -216,4 +216,11 @@ if (require.main === module) {
   }
 }
 
-module.exports = { analyzeGenerator, parseArguments, summarizeCollisions, summarizeTileComposition };
+module.exports = {
+  analyzeGenerator,
+  loadGenerator,
+  managerModePrefix,
+  parseArguments,
+  summarizeCollisions,
+  summarizeTileComposition
+};
